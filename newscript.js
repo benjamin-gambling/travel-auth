@@ -330,7 +330,6 @@ const loadLogInEventListeners = (boo) => {
     );
   }
 };
-user isnt logged in shouldnt remove 
 
 const showSignIn = (boo) => {
   if (boo) {
@@ -344,7 +343,6 @@ const showSignIn = (boo) => {
 
 Auth.onAuthStateChanged((user) => {
   if (user) {
-
     localStorageFunction.setUser(user);
     toggleSignIn(false);
     showSignIn(false);
