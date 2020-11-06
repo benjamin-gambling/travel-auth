@@ -19,6 +19,18 @@
   box-shadow: 2px 2px 15px 1px rgba(0, 0, 0, 0.75);
 }
 
+@media (max-width: 775px) {
+  #firebaseui-auth-container {
+    width: 70%;
+  }
+}
+
+@media (max-width: 600px) {
+  #firebaseui-auth-container {
+    width: 95%;
+  }
+}
+
 #authMethods {
   display: flex;
   flex-direction: column;
@@ -46,4 +58,33 @@
 
 .itin-exp-btns_txt {
   cursor: pointer;
+}
+
+#user-pic {
+  width: 40px;
+  background-repeat: no-repeat;
+  height: 40px;
+  background-size: 40px;
+  border-radius: 50%;
+  margin: 0px;
+  padding: 0px;
+}
+
+@media screen and (max-width: 610px) {
+  #user-pic {
+    top: 2px;
+    width: 33px;
+    height: 33px;
+    background-size: 33px;
+  }
+}
+
+#log-in {
+  padding: 0px;
+}
+
+#password-input,
+#email-input {
+  width: 220px;
+  padding: 8px;
 }

@@ -39,59 +39,117 @@ const facebookInit = () => {
 
 // LOCAL STORAGE FUNCTIONS
 const localStorageFunction = (() => {
+  const getLocalUser = () => JSON.parse(localStorage.getItem("User"));
+  const setLocalUser = () =>
+    localStorage.setItem("User", JSON.stringify(localUser));
+
+  const localUser = getLocalUser()
+    ? getLocalUser()
+    : {
+        email: "",
+        uid: "",
+        photoURL: "",
+        experiences: [],
+      };
+
   const getLoggedInStatus = () => localStorage.getItem("LoggedIn");
   const setLoggedInStatus = (boolean) =>
     localStorage.setItem("LoggedIn", boolean);
 
-  const getUID = () => localStorage.getItem("UserID");
-  const setUID = (result) => localStorage.setItem("UserID", result.user.uid);
-
-  const getEmail = () => localStorage.getItem("Email");
-  const setEmail = (result) => localStorage.setItem("Email", result.user.email);
-
-  const getPic = () => localStorage.getItem("Pic");
-  const setPic = (result) => localStorage.setItem("Pic", result.user.photoURL);
-
   const setUser = (result) => {
-    setLoggedInStatus(true);
-    setUID(result);
-    setEmail(result);
-    setPic(result);
-    console.log(result);
-    console.log(localStorage);
+    localUser.email = result.email;
+    localUser.uid = result.uid;
+    localUser.photoURL = result.photoURL;
+    localUser.experiences = getExperience();
+    setLocalUser();
+  };
+
+  const experiencePrevSelected = (tripID, expID) => {
+    return localUser.experiences.findIndex(
+      (x) => x.tripID === tripID && x.expID === expID
+    );
+  };
+
+  const getExperience = () => localUser.experiences;
+
+  const setExperience = (but) => {
+    const tripID = but.getAttribute("data-tripid");
+    const expID = but.getAttribute("data-experienceid");
+    let tripObj = { tripID, expID };
+    const expExists = experiencePrevSelected(tripID, expID);
+    expExists === -1
+      ? localUser.experiences.push(tripObj)
+      : localUser.experiences.splice(expExists, 1);
+    setLocalUser();
   };
 
   return {
-    getUID,
-    setUID,
+    localUser,
+    getLocalUser,
+    getLoggedInStatus,
+    setLoggedInStatus,
+    setUser,
+    experiencePrevSelected,
+    setExperience,
   };
 })();
 
 // SIGN IN CREDENTIALS
 const credentialAuth = (() => {
-  // Test Info
-  const email = "benjamin.gambling@gmail";
-  const password = "test123";
+  const local = localStorageFunction.localUser;
+  const emailInput = document.getElementById("email-input");
+  const passwordInput = document.getElementById("password-input");
+
+  let email = "";
+  let password = "";
+
+  const emailChangeOnInput = () => {
+    if (/@gmail.com$/.test(emailInput.value)) {
+      email = normalizeGmail(emailInput.value);
+    } else {
+      email = emailInput.value;
+    }
+  };
+
+  const inputEventListeners = (boo) => {
+    if (boo) {
+      emailInput.addEventListener("input", () => emailChangeOnInput());
+      passwordInput.addEventListener(
+        "input",
+        () => (password = passwordInput.value)
+      );
+    } else {
+      emailInput.removeEventListener("input", () => emailChangeOnInput());
+      passwordInput.removeEventListener(
+        "input",
+        () => (password = passwordInput.value)
+      );
+    }
+  };
+
+  const normalizeGmail = (str) => {
+    const inx = str.indexOf("@");
+    return str.substring(0, inx).replace(".", "") + str.substring(inx);
+  };
 
   const signIn = async () => {
-    await Auth.signInWithEmailAndPassword(email, password)
-      .then((result) => localStorageFunction.setUser(result))
-      .catch((error) => {
-        console.log(error);
-        signUp();
-      });
+    await Auth.signInWithEmailAndPassword(email, password).catch((error) => {
+      console.log(error);
+      signUp();
+    });
   };
 
   const signUp = async () => {
-    await Auth.createUserWithEmailAndPassword(email, password)
-      .then((result) => localStorageFunction.setUser(result))
-      .catch((error) => {
+    await Auth.createUserWithEmailAndPassword(email, password).catch(
+      (error) => {
         console.log(error);
-        // IF EMAIL USED IS IN DB (CHANGE WHEN GET DB)
-        if (localStorageFunction.getEmail() === email) {
+        // ADD IF EMAIL USED IS IN DB
+        const enteredEmailStored = email === local.email;
+        if (error.code === "auth/email-already-in-use" || enteredEmailStored) {
           link();
         }
-      });
+      }
+    );
   };
 
   const link = async () => {
@@ -99,16 +157,29 @@ const credentialAuth = (() => {
       email,
       password
     );
-    // Needs to sign user in to link so try's other provider methods
     await providerAuth.LogInToLink();
     await Auth.currentUser
       .linkWithCredential(await credentials)
-      .then((result) => localStorageFunction.setUID(result))
-      .catch((error) => console.log(error));
+      .then((result) => {
+        //   IF UID UPDATED DUE TO LINKING OF ACCOUNTS
+        console.log(result);
+        if (
+          result.user.uid !== local.uid &&
+          result.user.email === local.email
+        ) {
+          localUser.uid = result.user.uid;
+          console.log("UserID Updated");
+          if (!local.photoURL) {
+            local.photoURL = result.user.photoURL;
+          }
+        }
+      })
+      .catch();
   };
 
   return {
     signIn,
+    inputEventListeners,
   };
 })();
 
@@ -127,22 +198,15 @@ const providerAuth = (() => {
   const signIn = (provider) => {
     return Auth.signInWithPopup(provider)
       .then((result) => {
-        localStorageFunction.setUID(result);
         if (result) return true;
       })
-      .catch((error) => console.log(error));
+      .catch();
   };
 
   const linkWithProvider = (provider) => {
     return Auth.currentUser
       .linkWithPopup(provider)
-      .then(function (result) {
-        console.log(result);
-      })
-      .catch(function (error) {
-        console.log(error);
-        linkWithProvider(provider);
-      });
+      .catch((error) => linkWithProvider(provider));
   };
 
   //   If users email is already registered with another log in method it attempts the log in with all the
@@ -150,7 +214,6 @@ const providerAuth = (() => {
   const LogInToLink = async () => {
     for (i = 0; i < authMethods.length - 1; i++) {
       if (await signIn(authMethods[i])) {
-        console.log(i);
         break;
       }
     }
@@ -163,71 +226,132 @@ const providerAuth = (() => {
   };
 })();
 
-const loadLogInEventListeners = () => {
-  const emailAuth = document.getElementById("email");
-  emailAuth.addEventListener("click", () => {
-    credentialAuth.signIn();
-  });
-
-  const google = document.getElementById("google");
-  const facebook = document.getElementById("facebook");
-  [google, facebook].forEach((button) => {
-    button.addEventListener("click", () => providerAuth.assign(button));
-  });
-};
-
+// EXPERIENCE BUTTON CONTROLS
 const experience = (() => {
-  const add = (but) => {
-    but.setAttribute("data-experience-selected", "true");
-    but.innerHTML = `<i class="fa fa-heart" aria-hidden="true"></i>  REMOVE FROM LIST`;
-  };
-  const remove = (but) => {
-    but.setAttribute("data-experience-selected", "false");
-    but.innerHTML = `<i class="fa fa-heart-o" aria-hidden="true"></i>  ADD TO LIST`;
-  };
-
-  const initializeButton = (but) => {
-    but.setAttribute("data-experience-selected", "false");
-    but.addEventListener("click", () => {
-      toggle(but);
-      if (userProfile.loggedIn() === false) {
-        loadLogInEventListeners();
-        firebaseDiv.removeAttribute("hidden");
-      }
-    });
+  const showSelectedExperience = (but, boolean) => {
+    but.setAttribute("data-experience-selected", `${boolean}`);
+    but.innerHTML = boolean
+      ? `<i class="fa fa-heart" aria-hidden="true"></i>  REMOVE FROM LIST`
+      : `<i class="fa fa-heart-o" aria-hidden="true"></i>  ADD TO LIST`;
   };
 
   const toggle = (but) => {
-    but.getAttribute("data-experience-selected") === "true"
-      ? remove(but)
-      : add(but);
+    const expSelected = but.getAttribute("data-experience-selected");
+    expSelected === "false"
+      ? showSelectedExperience(but, true)
+      : showSelectedExperience(but, false);
+
+    localStorageFunction.setExperience(but);
   };
-  return {
-    add,
-    remove,
-    initializeButton,
-    toggle,
+
+  const initializeButton = (but, trip, exp) => {
+    but.setAttribute("data-experience-selected", "false");
+    but.setAttribute("data-tripid", trip);
+    but.setAttribute("data-experienceid", exp);
+    but.addEventListener("click", () => {
+      toggle(but);
+      if (localStorageFunction.getLoggedInStatus() !== "true") {
+        showSignIn(true);
+      }
+    });
   };
-})();
+  const buttonInfo = (but) => {
+    const experienceInfo = but
+      .closest(".w-dyn-item")
+      .querySelector("[data-gallery='true']");
+    const trip = experienceInfo.getAttribute("data-tripid");
+    const exp = experienceInfo.getAttribute("data-experienceid");
+    initializeButton(but, trip, exp);
+  };
 
-// USER PROFILE (IF PRESENT)
-const userProfile = (() => {
-  const loggedIn = () => (localStorageFunction.getUID() ? true : false);
-  const setID = () => {};
-  const setEmail = () => {};
-  const setPic = () => {};
-  const setExperiences = () => {};
+  const loadSelectedExperiences = (but) => {
+    const tripID = but.getAttribute("data-tripid");
+    const expID = but.getAttribute("data-experienceid");
+    if (localStorageFunction.experiencePrevSelected(tripID, expID) !== -1) {
+      showSelectedExperience(but, true);
+    }
+  };
 
-  return { loggedIn, setID, setEmail, setPic, setExperiences };
-})();
+  const experienceButtons = document.querySelectorAll(".itin-exp-btns_txt");
 
-window.onload = () => {
-  const addExperienceButtons = document.querySelectorAll(".itin-exp-btns_txt");
-  addExperienceButtons.forEach((but) => {
-    experience.initializeButton(but);
+  experienceButtons.forEach((but) => {
+    buttonInfo(but);
   });
+
+  const expButtons = (() => {
+    experienceButtons.forEach((but) => {
+      if (localStorageFunction.getLoggedInStatus() === "true") {
+        loadSelectedExperiences(but);
+      } else {
+        showSelectedExperience(but, false);
+      }
+    });
+  })();
+
+  return {
+    toggle,
+    expButtons,
+  };
+})();
+
+const toggleSignIn = (boolean) => {
+  const logInOutDiv = document.getElementById("signin");
+
+  if (boolean) {
+    localStorageFunction.setLoggedInStatus(false);
+    logInOutDiv.innerHTML = `<a id="log-in" href="#" class="nav-link w-nav-link">Sign In</a>`;
+    const logInButton = document.getElementById("log-in");
+    logInButton.addEventListener("click", () => showSignIn(true));
+  } else {
+    localStorageFunction.setLoggedInStatus(true);
+    logInOutDiv.innerHTML = `<div id="user-pic" class="nav-link w-nav-link" ></div>`;
+    const userPic = document.getElementById("user-pic");
+    userPic.style.backgroundImage = `url("${localStorageFunction.localUser.photoURL}")`;
+  }
 };
 
-// EMAIL SUCCESSFUL AUTH
+const loadLogInEventListeners = (boo) => {
+  const google = document.getElementById("google");
+  const facebook = document.getElementById("facebook");
+  const emailAuth = document.getElementById("email");
+  const providers = [google, facebook];
 
-// AUTH
+  if (boo) {
+    credentialAuth.inputEventListeners(true);
+    emailAuth.addEventListener("click", () => credentialAuth.signIn());
+    providers.forEach((but) => {
+      but.addEventListener("click", () => providerAuth.assign(but));
+    });
+  } else {
+    credentialAuth.inputEventListeners(false);
+    emailAuth.removeEventListener("click", () => credentialAuth.signIn());
+    providers.forEach((but) =>
+      but.removeEventListener("click", () => providerAuth.assign(but))
+    );
+  }
+};
+user isnt logged in shouldnt remove 
+
+const showSignIn = (boo) => {
+  if (boo) {
+    loadLogInEventListeners(true);
+    firebaseDiv.removeAttribute("hidden");
+  } else {
+    loadLogInEventListeners(false);
+    firebaseDiv.setAttribute("hidden", "");
+  }
+};
+
+Auth.onAuthStateChanged((user) => {
+  if (user) {
+
+    localStorageFunction.setUser(user);
+    toggleSignIn(false);
+    showSignIn(false);
+    experience.expButtons;
+  } else {
+    localStorageFunction.setLoggedInStatus(false);
+    toggleSignIn(true);
+    experience.expButtons;
+  }
+});

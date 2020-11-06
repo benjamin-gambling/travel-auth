@@ -80,6 +80,13 @@
           See all experiences and create your amazing holiday!
         </h3>
         <ul id="authMethods">
+          <li class="firebaseui-list-item auth-button">
+            <input type="email" id="email-input" placeholder="Email" />
+          </li>
+          <li class="firebaseui-list-item auth-button">
+            <input type="password" id="password-input" placeholder="Password" />
+          </li>
+
           <li id="email" class="firebaseui-list-item auth-button">
             <button
               class="firebaseui-idp-button mdl-button mdl-js-button mdl-button--raised firebaseui-idp-password firebaseui-id-idp-button"
@@ -157,8 +164,7 @@
         <nav role="navigation" class="w-nav-menu">
           <a href="#" id="previous-day" class="nav-link w-nav-link">Previous</a>
           <a href="#" id="next-day" class="nav-link w-nav-link">Next</a>
-          <div hidden id="user-pic" class="nav-link w-nav-link"></div>
-          <a id="signin" href="#" class="nav-link w-nav-link">Sign In</a>
+          <div id="signin" class="nav-link w-nav-link"></div>
         </nav>
         <div class="menu-button w-nav-button">
           <div class="w-icon-nav-menu"></div>
