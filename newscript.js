@@ -15,7 +15,7 @@ const firebaseDiv = document.getElementById("firebase-auth");
 const facebookInit = () => {
   window.fbAsyncInit = function () {
     FB.init({
-      appId: "3482893361786244",
+      appId: 3482893361786244,
       cookie: true,
       xfbml: true,
       version: "v8.0",
@@ -60,36 +60,26 @@ const localStorageFunction = (() => {
     localUser.email = result.email;
     localUser.uid = result.uid;
     localUser.photoURL = result.photoURL;
-    localUser.experiences = getExperience();
+    localUser.experiences = [];
     setLocalUser();
   };
 
-  const experiencePrevSelected = (tripID, expID) => {
-    return localUser.experiences.findIndex(
-      (x) => x.tripID === tripID && x.expID === expID
-    );
-  };
+  // const experiencePrevSelected = (tripID, expID) => {
+  //   return localUser.experiences.findIndex(
+  //     (x) => x.tripID === tripID && x.expID === expID
+  //   );
+  // };
 
-  const getExperience = () => localUser.experiences;
-
-  const setExperience = (but) => {
-    const tripID = but.getAttribute("data-tripid");
-    const expID = but.getAttribute("data-experienceid");
-    let tripObj = { tripID, expID };
-    const expExists = experiencePrevSelected(tripID, expID);
-    expExists === -1
-      ? localUser.experiences.push(tripObj)
-      : localUser.experiences.splice(expExists, 1);
-    setLocalUser();
-  };
+  const setExperience = (obj) => localUser.experiences.push(obj);
 
   return {
     localUser,
     getLocalUser,
+    setLocalUser,
     getLoggedInStatus,
     setLoggedInStatus,
     setUser,
-    experiencePrevSelected,
+    // experiencePrevSelected,
     setExperience,
   };
 })();
@@ -189,10 +179,8 @@ const providerAuth = (() => {
   const facebookProvider = new firebase.auth.FacebookAuthProvider();
   const authMethods = [googleProvider, facebookProvider];
 
-  const assign = async (button) => {
-    button.id === "google"
-      ? await signIn(googleProvider)
-      : await signIn(facebookProvider);
+  const assign = (button) => {
+    button.id === "google" ? signIn(googleProvider) : signIn(facebookProvider);
   };
 
   const signIn = (provider) => {
@@ -206,7 +194,7 @@ const providerAuth = (() => {
   const linkWithProvider = (provider) => {
     return Auth.currentUser
       .linkWithPopup(provider)
-      .catch((error) => linkWithProvider(provider));
+      .catch(() => linkWithProvider(provider));
   };
 
   //   If users email is already registered with another log in method it attempts the log in with all the
@@ -241,7 +229,7 @@ const experience = (() => {
       ? showSelectedExperience(but, true)
       : showSelectedExperience(but, false);
 
-    localStorageFunction.setExperience(but);
+    bubble.edit(but);
   };
 
   const initializeButton = (but, trip, exp) => {
@@ -264,13 +252,7 @@ const experience = (() => {
     initializeButton(but, trip, exp);
   };
 
-  const loadSelectedExperiences = (but) => {
-    const tripID = but.getAttribute("data-tripid");
-    const expID = but.getAttribute("data-experienceid");
-    if (localStorageFunction.experiencePrevSelected(tripID, expID) !== -1) {
-      showSelectedExperience(but, true);
-    }
-  };
+  const loadSelectedExperiences = (but) => showSelectedExperience(but, true);
 
   const experienceButtons = document.querySelectorAll(".itin-exp-btns_txt");
 
@@ -291,6 +273,105 @@ const experience = (() => {
   return {
     toggle,
     expButtons,
+  };
+})();
+
+const bubble = (() => {
+  const api = `2830d61fdf419466f737ce9889444aae`;
+  const test = true;
+  const version = test ? `/version-test` : "";
+
+  const endpointWithConstraints = (end, key, value) => {
+    const constraintObj = [
+      {
+        key: key,
+        constraint_type: "equals",
+        value: value,
+      },
+    ];
+    const urlCode = JSON.stringify(constraintObj);
+
+    return `${end}?constraints=${urlCode}`;
+  };
+
+  const data = (endpoint, method, obj) => {
+    const area = method === "POST" ? "wf" : "obj";
+    const data = fetch(
+      `https://celie.bubbleapps.io${version}/api/1.1/${area}/${endpoint}`,
+      {
+        method: method,
+        body: obj ? JSON.stringify(obj) : null,
+        headers: {
+          "Content-type": "application/json; charset=UTF-8",
+          Authorization: `Bearer ${api}`,
+        },
+      }
+    )
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((data) => data)
+      .catch((error) => console.log(error));
+
+    return data;
+  };
+
+  const pull = async (user) => {
+    const getExpEndpoint = endpointWithConstraints(
+      "experiences",
+      "userid",
+      user.uid
+    );
+    const userExp = await data(getExpEndpoint, "GET");
+
+    userExp.response.results.forEach((exp) => {
+      let expObj = {
+        tripID: exp.TripID,
+        expID: exp.ExperienceID,
+      };
+      localStorageFunction.setExperience(expObj);
+    });
+  };
+
+  const edit = (but) => {
+    if (localStorageFunction.localUser.uid === "") return;
+    const expObj = {
+      userID: localStorageFunction.localUser.uid,
+      tripID: but.getAttribute("data-tripid"),
+      experienceID: but.getAttribute("data-experienceid"),
+    };
+    data("edit-experiences", "POST", expObj);
+  };
+
+  const register = async (user) => {
+    const newUser = { email: user.email, userID: user.uid };
+    await data("/signup", "POST", newUser)
+      .then(() => {
+        const firstExpSelected = document.querySelector(
+          "[data-experience-selected='true']"
+        );
+        edit(firstExpSelected);
+      })
+      .catch((error) => console.log(error));
+  };
+
+  const connect = async (user) => {
+    const checkUserEndpoint = endpointWithConstraints(
+      "userids",
+      "email",
+      user.email
+    );
+
+    const bubbleUser = await data(checkUserEndpoint, "GET");
+
+    bubbleUser.response.count
+      ? await pull(user)
+          .then(() => localStorageFunction.setLocalUser())
+          .then(() => experience.expButtons)
+      : await register(user);
+  };
+
+  return {
+    edit,
+    connect,
   };
 })();
 
@@ -341,15 +422,14 @@ const showSignIn = (boo) => {
   }
 };
 
-Auth.onAuthStateChanged((user) => {
+Auth.onAuthStateChanged(async (user) => {
   if (user) {
     localStorageFunction.setUser(user);
     toggleSignIn(false);
     showSignIn(false);
-    experience.expButtons;
+    bubble.connect(user);
   } else {
     localStorageFunction.setLoggedInStatus(false);
     toggleSignIn(true);
-    experience.expButtons;
   }
 });
