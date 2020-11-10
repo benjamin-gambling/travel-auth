@@ -49,38 +49,20 @@ const localStorageFunction = (() => {
         email: "",
         uid: "",
         photoURL: "",
-        experiences: [],
       };
-
-  const getLoggedInStatus = () => localStorage.getItem("LoggedIn");
-  const setLoggedInStatus = (boolean) =>
-    localStorage.setItem("LoggedIn", boolean);
 
   const setUser = (result) => {
     localUser.email = result.email;
     localUser.uid = result.uid;
     localUser.photoURL = result.photoURL;
-    localUser.experiences = [];
     setLocalUser();
   };
-
-  // const experiencePrevSelected = (tripID, expID) => {
-  //   return localUser.experiences.findIndex(
-  //     (x) => x.tripID === tripID && x.expID === expID
-  //   );
-  // };
-
-  const setExperience = (obj) => localUser.experiences.push(obj);
 
   return {
     localUser,
     getLocalUser,
     setLocalUser,
-    getLoggedInStatus,
-    setLoggedInStatus,
     setUser,
-    // experiencePrevSelected,
-    setExperience,
   };
 })();
 
@@ -216,6 +198,9 @@ const providerAuth = (() => {
 
 // EXPERIENCE BUTTON CONTROLS
 const experience = (() => {
+  const expID = (but) => but.getAttribute("data-experienceid");
+  const tripID = (but) => but.getAttribute("data-tripid");
+
   const showSelectedExperience = (but, boolean) => {
     but.setAttribute("data-experience-selected", `${boolean}`);
     but.innerHTML = boolean
@@ -238,7 +223,7 @@ const experience = (() => {
     but.setAttribute("data-experienceid", exp);
     but.addEventListener("click", () => {
       toggle(but);
-      if (localStorageFunction.getLoggedInStatus() !== "true") {
+      if (!Auth.currentUser) {
         showSignIn(true);
       }
     });
@@ -247,12 +232,14 @@ const experience = (() => {
     const experienceInfo = but
       .closest(".w-dyn-item")
       .querySelector("[data-gallery='true']");
-    const trip = experienceInfo.getAttribute("data-tripid");
-    const exp = experienceInfo.getAttribute("data-experienceid");
+    const trip = tripID(experienceInfo);
+    const exp = expID(experienceInfo);
     initializeButton(but, trip, exp);
   };
 
-  const loadSelectedExperiences = (but) => showSelectedExperience(but, true);
+  const experiencePrevSelected = (arr, trip, exp) => {
+    return arr.findIndex((x) => x.tripID === trip && x.expID === exp);
+  };
 
   const experienceButtons = document.querySelectorAll(".itin-exp-btns_txt");
 
@@ -260,17 +247,25 @@ const experience = (() => {
     buttonInfo(but);
   });
 
-  const expButtons = (() => {
-    experienceButtons.forEach((but) => {
-      if (localStorageFunction.getLoggedInStatus() === "true") {
-        loadSelectedExperiences(but);
+  const expButtons = async (arr) => {
+    const userLoggedIn = await Auth.currentUser;
+
+    experienceButtons.forEach(async (but) => {
+      let tripId = tripID(but);
+      let expId = expID(but);
+      if (userLoggedIn) {
+        if (experiencePrevSelected(arr, tripId, expId) >= 0) {
+          showSelectedExperience(but, true);
+        }
       } else {
         showSelectedExperience(but, false);
       }
     });
-  })();
+  };
 
   return {
+    expID,
+    expID,
     toggle,
     expButtons,
   };
@@ -309,7 +304,7 @@ const bubble = (() => {
     )
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
       .then((data) => data)
-      .catch((error) => console.log(error));
+      .catch();
 
     return data;
   };
@@ -321,22 +316,24 @@ const bubble = (() => {
       user.uid
     );
     const userExp = await data(getExpEndpoint, "GET");
-
-    userExp.response.results.forEach((exp) => {
+    let userExpArray = [];
+    await userExp.response.results.forEach((exp) => {
       let expObj = {
         tripID: exp.TripID,
         expID: exp.ExperienceID,
       };
-      localStorageFunction.setExperience(expObj);
+      userExpArray.push(expObj);
     });
+
+    return userExpArray;
   };
 
   const edit = (but) => {
     if (localStorageFunction.localUser.uid === "") return;
     const expObj = {
       userID: localStorageFunction.localUser.uid,
-      tripID: but.getAttribute("data-tripid"),
-      experienceID: but.getAttribute("data-experienceid"),
+      tripID: experience.tripID(but),
+      experienceID: experience.expID(but),
     };
     data("edit-experiences", "POST", expObj);
   };
@@ -350,7 +347,7 @@ const bubble = (() => {
         );
         edit(firstExpSelected);
       })
-      .catch((error) => console.log(error));
+      .catch();
   };
 
   const connect = async (user) => {
@@ -363,9 +360,7 @@ const bubble = (() => {
     const bubbleUser = await data(checkUserEndpoint, "GET");
 
     bubbleUser.response.count
-      ? await pull(user)
-          .then(() => localStorageFunction.setLocalUser())
-          .then(() => experience.expButtons)
+      ? await pull(user).then((arr) => experience.expButtons(arr))
       : await register(user);
   };
 
@@ -379,12 +374,10 @@ const toggleSignIn = (boolean) => {
   const logInOutDiv = document.getElementById("signin");
 
   if (boolean) {
-    localStorageFunction.setLoggedInStatus(false);
     logInOutDiv.innerHTML = `<a id="log-in" href="#" class="nav-link w-nav-link">Sign In</a>`;
     const logInButton = document.getElementById("log-in");
     logInButton.addEventListener("click", () => showSignIn(true));
   } else {
-    localStorageFunction.setLoggedInStatus(true);
     logInOutDiv.innerHTML = `<div id="user-pic" class="nav-link w-nav-link" ></div>`;
     const userPic = document.getElementById("user-pic");
     userPic.style.backgroundImage = `url("${localStorageFunction.localUser.photoURL}")`;
@@ -422,14 +415,13 @@ const showSignIn = (boo) => {
   }
 };
 
-Auth.onAuthStateChanged(async (user) => {
+Auth.onAuthStateChanged((user) => {
   if (user) {
     localStorageFunction.setUser(user);
     toggleSignIn(false);
     showSignIn(false);
     bubble.connect(user);
   } else {
-    localStorageFunction.setLoggedInStatus(false);
     toggleSignIn(true);
   }
 });
