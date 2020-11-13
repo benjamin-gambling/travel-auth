@@ -10,12 +10,14 @@ const firebaseConfig = {
 // FIREBASE INIT
 firebase.initializeApp(firebaseConfig);
 const Auth = firebase.auth();
+const Functions = firebase.functions();
+
 const firebaseDiv = document.getElementById("firebase-auth");
 // FACEBOOK INIT
 const facebookInit = () => {
   window.fbAsyncInit = function () {
     FB.init({
-      appId: 3482893361786244,
+      appId: 367693800966361,
       cookie: true,
       xfbml: true,
       version: "v8.0",
@@ -265,101 +267,137 @@ const experience = (() => {
 
   return {
     expID,
-    expID,
+    tripID,
     toggle,
     expButtons,
   };
 })();
 
 const bubble = (() => {
-  const api = `2830d61fdf419466f737ce9889444aae`;
-  const test = true;
-  const version = test ? `/version-test` : "";
+  // const api = `2830d61fdf419466f737ce9889444aae`;
+  // const test = true;
+  // const version = test ? `/version-test` : "";
 
-  const endpointWithConstraints = (end, key, value) => {
-    const constraintObj = [
-      {
-        key: key,
-        constraint_type: "equals",
-        value: value,
-      },
-    ];
-    const urlCode = JSON.stringify(constraintObj);
+  // const endpointWithConstraints = (end, key, value) => {
+  //   const constraintObj = [
+  //     {
+  //       key: key,
+  //       constraint_type: "equals",
+  //       value: value,
+  //     },
+  //   ];
+  //   const urlCode = JSON.stringify(constraintObj);
 
-    return `${end}?constraints=${urlCode}`;
-  };
+  //   return `${end}?constraints=${urlCode}`;
+  // };
 
-  const data = (endpoint, method, obj) => {
-    const area = method === "POST" ? "wf" : "obj";
-    const data = fetch(
-      `https://celie.bubbleapps.io${version}/api/1.1/${area}/${endpoint}`,
-      {
-        method: method,
-        body: obj ? JSON.stringify(obj) : null,
-        headers: {
-          "Content-type": "application/json; charset=UTF-8",
-          Authorization: `Bearer ${api}`,
-        },
-      }
-    )
-      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
-      .then((data) => data)
-      .catch();
+  // const data = (endpoint, method, obj) => {
+  //   const area = method === "POST" ? "wf" : "obj";
+  //   const data = fetch(
+  //     `https://celie.bubbleapps.io${version}/api/1.1/${area}/${endpoint}`,
+  //     {
+  //       method: method,
+  //       body: obj ? JSON.stringify(obj) : null,
+  //       headers: {
+  //         "Content-type": "application/json; charset=UTF-8",
+  //         Authorization: `Bearer ${api}`,
+  //       },
+  //     }
+  //   )
+  //     .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+  //     .then((data) => data)
+  //     .catch();
 
-    return data;
-  };
+  //   return data;
+  // };
 
   const pull = async (user) => {
-    const getExpEndpoint = endpointWithConstraints(
-      "experiences",
-      "userid",
-      user.uid
-    );
-    const userExp = await data(getExpEndpoint, "GET");
-    let userExpArray = [];
-    await userExp.response.results.forEach((exp) => {
-      let expObj = {
-        tripID: exp.TripID,
-        expID: exp.ExperienceID,
-      };
-      userExpArray.push(expObj);
-    });
+    // const getExpEndpoint = endpointWithConstraints(
+    //   "experiences",
+    //   "userid",
+    //   user.uid
+    // );
+    // const userExp = await data(getExpEndpoint, "GET");
 
-    return userExpArray;
+    const getExperiences = await Functions.httpsCallable("getExperiences");
+    const userExp = await getExperiences({
+      uid: user.uid,
+    })
+      .then((data) => data)
+      .catch((e) => console.log(e));
+
+    const experienceArray = await userExp.data.experiences;
+
+    // await userExp.data.experiences.forEach((exp) => {
+    //   let expObj = {
+    //     tripID: exp.TripID,
+    //     expID: exp.ExperienceID,
+    //   };
+    //   userExpArray.push(expObj);
+    // });
+
+    return await experienceArray;
   };
 
-  const edit = (but) => {
-    if (localStorageFunction.localUser.uid === "") return;
-    const expObj = {
-      userID: localStorageFunction.localUser.uid,
+  const edit = async (but) => {
+    if (!Auth.currentUser) return;
+
+    // const expObj = {
+    //   userID: localStorageFunction.localUser.uid,
+    //   tripID: experience.tripID(but),
+    //   experienceID: experience.expID(but),
+    // };
+    // data("edit-experiences", "POST", expObj);
+
+    const editExperiences = Functions.httpsCallable("editExperience");
+
+    editExperiences({
+      userID: Auth.currentUser.uid,
       tripID: experience.tripID(but),
       experienceID: experience.expID(but),
-    };
-    data("edit-experiences", "POST", expObj);
+    }).catch((e) => console.log(e));
   };
 
   const register = async (user) => {
-    const newUser = { email: user.email, userID: user.uid };
-    await data("/signup", "POST", newUser)
-      .then(() => {
-        const firstExpSelected = document.querySelector(
-          "[data-experience-selected='true']"
-        );
-        edit(firstExpSelected);
-      })
-      .catch();
+    // const newUser = { email: user.email, userID: user.uid };
+    // await data("/signup", "POST", newUser)
+    //   .then(() => {
+    //     const firstExpSelected = document.querySelector(
+    //       "[data-experience-selected='true']"
+    //     );
+    //     edit(firstExpSelected);
+    //   })
+    //   .catch();
+
+    const signUp = Functions.httpsCallable("signUp");
+
+    signUp({
+      email: user.email,
+      userID: user.uid,
+    })
+      .then((data) => console.log(data))
+      .catch((e) => console.log(e));
   };
 
   const connect = async (user) => {
-    const checkUserEndpoint = endpointWithConstraints(
-      "userids",
-      "email",
-      user.email
-    );
+    // const checkUserEndpoint = endpointWithConstraints(
+    //   "userids",
+    //   "email",
+    //   user.email
+    // );
 
-    const bubbleUser = await data(checkUserEndpoint, "GET");
+    // const bubbleUser = await data(checkUserEndpoint, "GET");
 
-    bubbleUser.response.count
+    // bubbleUser.response.count
+    //   ? await pull(user).then((arr) => experience.expButtons(arr))
+    //   : await register(user);
+
+    const getUser = Functions.httpsCallable("getUser");
+    const currentUser = await getUser({ email: user.email })
+      .then((data) => data)
+      .catch((e) => console.log(e));
+
+    (await currentUser.data.userFound)
       ? await pull(user).then((arr) => experience.expButtons(arr))
       : await register(user);
   };
@@ -380,7 +418,7 @@ const toggleSignIn = (boolean) => {
   } else {
     logInOutDiv.innerHTML = `<div id="user-pic" class="nav-link w-nav-link" ></div>`;
     const userPic = document.getElementById("user-pic");
-    userPic.style.backgroundImage = `url("${localStorageFunction.localUser.photoURL}")`;
+    userPic.style.backgroundImage = `url("${Auth.currentUser.photoURL}")`;
   }
 };
 
@@ -388,20 +426,29 @@ const loadLogInEventListeners = (boo) => {
   const google = document.getElementById("google");
   const facebook = document.getElementById("facebook");
   const emailAuth = document.getElementById("email");
+  const emailNext = [...document.querySelectorAll(".email-next")];
+  const emailClick = document.getElementById("email-click");
   const providers = [google, facebook];
 
   if (boo) {
     credentialAuth.inputEventListeners(true);
-    emailAuth.addEventListener("click", () => credentialAuth.signIn());
+
+    emailClick.addEventListener("click", () => {
+      emailAuth.addEventListener("click", () => credentialAuth.signIn());
+      emailNext.forEach((elm) => (elm.style.display = "block"));
+      providers.forEach((elm) => (elm.style.display = "none"));
+    });
     providers.forEach((but) => {
       but.addEventListener("click", () => providerAuth.assign(but));
     });
   } else {
     credentialAuth.inputEventListeners(false);
     emailAuth.removeEventListener("click", () => credentialAuth.signIn());
-    providers.forEach((but) =>
-      but.removeEventListener("click", () => providerAuth.assign(but))
-    );
+    emailNext.forEach((elm) => (elm.style.display = "none"));
+    providers.forEach((but) => {
+      but.removeEventListener("click", () => providerAuth.assign(but));
+      but.style.display = "block";
+    });
   }
 };
 

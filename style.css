@@ -1,15 +1,19 @@
+html {
+  width: 100vw;
+}
+
 #firebase-auth {
   position: fixed;
   top: 0;
   left: 0;
   height: 100%;
   width: 100%;
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: rgba(255, 255, 255, 0.75);
   z-index: 99;
 }
 
 #firebaseui-auth-container {
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: rgba(0, 0, 0, 0.8);
   padding: 40px;
   position: fixed;
   top: 50%;
@@ -17,17 +21,12 @@
   transform: translate(-50%, -50%);
   border-radius: 2px;
   box-shadow: 2px 2px 15px 1px rgba(0, 0, 0, 0.75);
+  font-family: Inter, sans-serif;
 }
 
 @media (max-width: 775px) {
   #firebaseui-auth-container {
-    width: 70%;
-  }
-}
-
-@media (max-width: 600px) {
-  #firebaseui-auth-container {
-    width: 95%;
+    width: 100%;
   }
 }
 
@@ -42,7 +41,7 @@
 
 #auth-titile {
   color: rgba(255, 255, 255, 1);
-  font-weight: 400;
+  font-weight: 300;
   margin: 0px;
   padding-bottom: 20px;
   text-align: center;
@@ -51,9 +50,6 @@
 .auth-button {
   margin: 6px;
   min-width: 220px;
-}
-
-.auth-button > li {
 }
 
 .itin-exp-btns_txt {
@@ -79,7 +75,7 @@
   }
 }
 
-#log-in {
+#signin {
   padding: 0px;
 }
 
