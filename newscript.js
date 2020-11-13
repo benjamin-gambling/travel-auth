@@ -399,7 +399,9 @@ const bubble = (() => {
 
     (await currentUser.data.userFound)
       ? await pull(user).then((arr) => experience.expButtons(arr))
-      : await register(user);
+      : await register(user).then(() =>
+          edit(document.querySelector("[data-experience-selected='true']"))
+        );
   };
 
   return {
@@ -432,11 +434,12 @@ const loadLogInEventListeners = (boo) => {
 
   if (boo) {
     credentialAuth.inputEventListeners(true);
-
+    emailAuth.addEventListener("click", () => credentialAuth.signIn());
     emailClick.addEventListener("click", () => {
-      emailAuth.addEventListener("click", () => credentialAuth.signIn());
       emailNext.forEach((elm) => (elm.style.display = "block"));
       providers.forEach((elm) => (elm.style.display = "none"));
+      emailClick.style.display = "none";
+      emailAuth.style.display = "block";
     });
     providers.forEach((but) => {
       but.addEventListener("click", () => providerAuth.assign(but));
@@ -449,6 +452,8 @@ const loadLogInEventListeners = (boo) => {
       but.removeEventListener("click", () => providerAuth.assign(but));
       but.style.display = "block";
     });
+    emailClick.style.display = "block";
+    emailAuth.style.display = "none";
   }
 };
 
