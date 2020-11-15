@@ -1,0 +1,66 @@
+Implementation of User Auth/Sign Up
+
+Sign in screen
+
+Copy and paste all of the file attached called sign-in.html
+
+This Is a div separate to the other divs (nav, itin, trip etc) I added it before the nav bar but it can be placed anywhere within the body. 
+
+To match my styling you'll need to add all of the styles found in ‘style.css’ and add the following link (taken from firebase UI) to the header. 
+
+
+<link
+      type="text/css"
+      rel="stylesheet"
+      href="https://www.gstatic.com/firebasejs/ui/4.6.1/firebase-ui-auth.css"
+    />
+
+Script 
+
+	Add the following Scripts to initialize and implement firebase 
+
+<script src="https://www.gstatic.com/firebasejs/8.0.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.0.1/firebase-auth.js"></script>
+    <script src=“https://www.gstatic.com/firebasejs/8.0.1/firebase-functions.js"></script>
+
+Below this add another Script tag (THIS MUST BE AFTER THE THREE ABOVE)
+
+<script>
+“Copy and paste the contents on the attached file newscript.js"
+</script>
+
+
+
+
+
+Experience Buttons (optional)
+
+To do what I did with the buttons I had to slightly change them around. To do this the buttons change the code to : -
+
+<div class="itin-exp-btns">
+                <div class="itin-exp-btns-addlist">
+                  <div class="itin-exp-btns_txt">
+                    <i class="fa fa-heart-o" aria-hidden="true"></i>
+                    ADD TO LIST
+                  </div>
+                </div>
+                <a href="#" class="itin-exp-btns_share w-button"
+                  >SHARE WITH SOMEONE</a
+                >
+              </div>
+
+Aswell add the following link to the head (this is what I use to fill the heart) : - 
+
+<link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
+    />
+
+
+4. Sign in button (optional) 
+
+To add the sign in button like I did just add this div to the nav section (after the next button). 
+
+<div id="signin" class="nav-link w-nav-link"></div>
+
+	

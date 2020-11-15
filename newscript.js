@@ -107,16 +107,14 @@ const credentialAuth = (() => {
   };
 
   const signIn = async () => {
-    await Auth.signInWithEmailAndPassword(email, password).catch((error) => {
-      console.log(error);
-      signUp();
-    });
+    await Auth.signInWithEmailAndPassword(email, password).catch(() =>
+      signUp()
+    );
   };
 
   const signUp = async () => {
     await Auth.createUserWithEmailAndPassword(email, password).catch(
       (error) => {
-        console.log(error);
         // ADD IF EMAIL USED IS IN DB
         const enteredEmailStored = email === local.email;
         if (error.code === "auth/email-already-in-use" || enteredEmailStored) {
@@ -135,17 +133,8 @@ const credentialAuth = (() => {
     await Auth.currentUser
       .linkWithCredential(await credentials)
       .then((result) => {
-        //   IF UID UPDATED DUE TO LINKING OF ACCOUNTS
-        console.log(result);
-        if (
-          result.user.uid !== local.uid &&
-          result.user.email === local.email
-        ) {
-          localUser.uid = result.user.uid;
-          console.log("UserID Updated");
-          if (!local.photoURL) {
-            local.photoURL = result.user.photoURL;
-          }
+        if (!local.photoURL) {
+          local.photoURL = result.user.photoURL;
         }
       })
       .catch();
@@ -181,8 +170,6 @@ const providerAuth = (() => {
       .catch(() => linkWithProvider(provider));
   };
 
-  //   If users email is already registered with another log in method it attempts the log in with all the
-  //   provider methods until successful so it can link accounts
   const LogInToLink = async () => {
     for (i = 0; i < authMethods.length - 1; i++) {
       if (await signIn(authMethods[i])) {
@@ -274,67 +261,17 @@ const experience = (() => {
 })();
 
 const bubble = (() => {
-  // const api = `2830d61fdf419466f737ce9889444aae`;
-  // const test = true;
-  // const version = test ? `/version-test` : "";
+  let userId;
 
-  // const endpointWithConstraints = (end, key, value) => {
-  //   const constraintObj = [
-  //     {
-  //       key: key,
-  //       constraint_type: "equals",
-  //       value: value,
-  //     },
-  //   ];
-  //   const urlCode = JSON.stringify(constraintObj);
-
-  //   return `${end}?constraints=${urlCode}`;
-  // };
-
-  // const data = (endpoint, method, obj) => {
-  //   const area = method === "POST" ? "wf" : "obj";
-  //   const data = fetch(
-  //     `https://celie.bubbleapps.io${version}/api/1.1/${area}/${endpoint}`,
-  //     {
-  //       method: method,
-  //       body: obj ? JSON.stringify(obj) : null,
-  //       headers: {
-  //         "Content-type": "application/json; charset=UTF-8",
-  //         Authorization: `Bearer ${api}`,
-  //       },
-  //     }
-  //   )
-  //     .then((res) => (res.ok ? res.json() : Promise.reject(res)))
-  //     .then((data) => data)
-  //     .catch();
-
-  //   return data;
-  // };
-
-  const pull = async (user) => {
-    // const getExpEndpoint = endpointWithConstraints(
-    //   "experiences",
-    //   "userid",
-    //   user.uid
-    // );
-    // const userExp = await data(getExpEndpoint, "GET");
-
+  const pull = async () => {
     const getExperiences = await Functions.httpsCallable("getExperiences");
     const userExp = await getExperiences({
-      uid: user.uid,
+      uid: userId,
     })
       .then((data) => data)
-      .catch((e) => console.log(e));
+      .catch();
 
     const experienceArray = await userExp.data.experiences;
-
-    // await userExp.data.experiences.forEach((exp) => {
-    //   let expObj = {
-    //     tripID: exp.TripID,
-    //     expID: exp.ExperienceID,
-    //   };
-    //   userExpArray.push(expObj);
-    // });
 
     return await experienceArray;
   };
@@ -342,66 +279,45 @@ const bubble = (() => {
   const edit = async (but) => {
     if (!Auth.currentUser) return;
 
-    // const expObj = {
-    //   userID: localStorageFunction.localUser.uid,
-    //   tripID: experience.tripID(but),
-    //   experienceID: experience.expID(but),
-    // };
-    // data("edit-experiences", "POST", expObj);
-
     const editExperiences = Functions.httpsCallable("editExperience");
 
     editExperiences({
-      userID: Auth.currentUser.uid,
+      userID: userId,
       tripID: experience.tripID(but),
       experienceID: experience.expID(but),
-    }).catch((e) => console.log(e));
+    }).catch();
   };
 
   const register = async (user) => {
-    // const newUser = { email: user.email, userID: user.uid };
-    // await data("/signup", "POST", newUser)
-    //   .then(() => {
-    //     const firstExpSelected = document.querySelector(
-    //       "[data-experience-selected='true']"
-    //     );
-    //     edit(firstExpSelected);
-    //   })
-    //   .catch();
-
     const signUp = Functions.httpsCallable("signUp");
 
     signUp({
       email: user.email,
-      userID: user.uid,
-    })
-      .then((data) => console.log(data))
-      .catch((e) => console.log(e));
+      userID: userId,
+    }).catch();
   };
 
   const connect = async (user) => {
-    // const checkUserEndpoint = endpointWithConstraints(
-    //   "userids",
-    //   "email",
-    //   user.email
-    // );
-
-    // const bubbleUser = await data(checkUserEndpoint, "GET");
-
-    // bubbleUser.response.count
-    //   ? await pull(user).then((arr) => experience.expButtons(arr))
-    //   : await register(user);
-
     const getUser = Functions.httpsCallable("getUser");
     const currentUser = await getUser({ email: user.email })
-      .then((data) => data)
-      .catch((e) => console.log(e));
+      .then((res) => res.data.userFound)
+      .catch();
 
-    (await currentUser.data.userFound)
-      ? await pull(user).then((arr) => experience.expButtons(arr))
-      : await register(user).then(() =>
+    const currentUserID = currentUser.results[0].UserID;
+
+    userId = currentUserID !== user.uid ? currentUserID : Auth.currentUser.uid;
+
+    if (await currentUser.count) {
+      await pull()
+        .then((arr) => experience.expButtons(arr))
+        .catch();
+    } else {
+      await register(user)
+        .then(() =>
           edit(document.querySelector("[data-experience-selected='true']"))
-        );
+        )
+        .catch();
+    }
   };
 
   return {
